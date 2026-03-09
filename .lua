@@ -1,69 +1,68 @@
-local player = game.Players.LocalPlayer
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
-local humanoid = char:WaitForChild("Humanoid")
 local rootPart = char:WaitForChild("HumanoidRootPart")
 
 -- Настройки
-local AURA_RADIUS = 20 -- Радиус ауры в studs
-local DAMAGE_PER_TICK = 10 -- Урон за один тик
-local TICK_SPEED = 0.1 -- Частота урона (в секундах)
-local AURA_COLOR = Color3.fromRGB(255, 0, 0) -- Красный цвет ауры
+local AURA_RADIUS = 15
+local DAMAGE_PER_TICK = 999 -- Огромный урон
+local TICK_SPEED = 0.05 -- Часто наносим
+local AURA_COLOR = Color3.fromRGB(255, 0, 0)
 
--- Функция для создания визуальной ауры
-local function CreateAuraVisual()
-    local aura = Instance.new("Part")
-    aura.Shape = Enum.PartType.Ball
-    aura.Material = Enum.Material.Neon
-    aura.Size = Vector3.new(AURA_RADIUS * 2, AURA_RADIUS * 2, AURA_RADIUS * 2)
-    aura.Color = AURA_COLOR
-    aura.Transparency = 0.5
-    aura.CanCollide = false
-    aura.CFrame = rootPart.CFrame
-    aura.TopSurface = Enum.SurfaceType.Smooth
-    aura.BottomSurface = Enum.SurfaceType.Smooth
+-- [[ СОЗДАНИЕ АУРЫ ]] --
+local function CreateAura()
+    local p = Instance.new("Part")
+    p.Name = "VisualAura"
+    p.Shape = Enum.PartType.Ball
+    p.Material = Enum.Material.ForceField
+    p.Size = Vector3.new(AURA_RADIUS*2, AURA_RADIUS*2, AURA_RADIUS*2)
+    p.Color = AURA_COLOR
+    p.CanCollide = false
+    p.Massless = true
+    p.Parent = char
     
-    local weld = Instance.new("WeldConstraint")
+    local weld = Instance.new("Weld", p)
     weld.Part0 = rootPart
-    weld.Part1 = aura
-    weld.Parent = aura
-    
-    aura.Parent = char
-    return aura
+    weld.Part1 = p
+    return p
 end
 
--- Функция для нанесения урона врагам
-local function DamageNearbyEnemies()
-    local players = game.Players:GetPlayers()
-    
-    for _, otherPlayer in pairs(players) do
-        if otherPlayer == player then continue end
+local auraPart = CreateAura()
+
+-- [[ ЛОГИКА АТАКИ - УБИВАЕТ ДО СМЕРТИ ]] --
+local function AttackEnemies()
+    for _, target in pairs(Players:GetPlayers()) do
+        if target == player then continue end
         
-        local otherChar = otherPlayer.Character
-        if not otherChar then continue end
+        local tChar = target.Character
+        local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+        local tHum = tChar and tChar:FindFirstChild("Humanoid")
         
-        local otherHumanoid = otherChar:FindFirstChild("Humanoid")
-        local otherRoot = otherChar:FindFirstChild("HumanoidRootPart")
-        
-        if not otherHumanoid or not otherRoot then continue end
-        
-        -- Проверяем расстояние
-        local distance = (rootPart.Position - otherRoot.Position).Magnitude
-        
-        if distance <= AURA_RADIUS then
-            otherHumanoid:TakeDamage(DAMAGE_PER_TICK)
-            print("Урон нанесён " .. otherPlayer.Name)
+        if tRoot and tHum and tHum.Health > 0 then
+            local dist = (rootPart.Position - tRoot.Position).Magnitude
+            if dist <= AURA_RADIUS then
+                -- Наносим урон
+                tHum:TakeDamage(DAMAGE_PER_TICK)
+                
+                -- Вспышка при попадании
+                auraPart.Color = Color3.fromRGB(255, 255, 255)
+                task.delay(0.1, function() 
+                    auraPart.Color = AURA_COLOR 
+                end)
+                
+                print("💀 Урон нанесён " .. target.Name .. " | HP: " .. tHum.Health)
+            end
         end
     end
 end
 
--- Создаём ауру
-local aura = CreateAuraVisual()
-print("✨ Килл аура активирована!")
+-- [[ ЗАПУСК АУРЫ ]] --
+print("💀 Килл аура МАКСИМУМ ЗАПУЩЕНА. Противники будут убиты до смерти!")
 
--- Бесконечный цикл урона
-while humanoid.Health > 0 do
-    DamageNearbyEnemies()
-    wait(TICK_SPEED)
-end
-
-print("❌ Килл аура деактивирована (персонаж мёртв)")
+task.spawn(function()
+    while char and char:Parent do
+        AttackEnemies()
+        task.wait(TICK_SPEED)
+    end
+end)
